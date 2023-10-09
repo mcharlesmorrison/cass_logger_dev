@@ -1,3 +1,11 @@
+import os
+import time
+import serial
+import numpy as np
+from pathlib import Path
+import pandas as pd
+import serial.tools.list_ports
+
 # Copyright (c) 2023 Cass Labs LLC (author: Matthew Morrison)
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -18,13 +26,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import os
-import time
-import serial
-import numpy as np
-from pathlib import Path
-import pandas as pd
-import serial.tools.list_ports
+# -------------------------------------------------------------------------- #
 
 # PORT_NAME = '/dev/tty.usbmodem136344901' # You can manually set port name
 
