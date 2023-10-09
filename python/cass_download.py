@@ -26,7 +26,7 @@ from pathlib import Path
 import pandas as pd
 import serial.tools.list_ports
 
-# PORT_NAME = '/dev/tty.usbmodem136344901' # Use this to manually set port name
+# PORT_NAME = '/dev/tty.usbmodem136344901' # You can manually set port name
 
 def get_serial_port():
     ports = serial.tools.list_ports.comports()
