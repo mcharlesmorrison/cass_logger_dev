@@ -178,25 +178,6 @@ def download_all():
     return filepaths[-1]
 
 
-def put_device_ID(device_ID):
-    ser = establish_serial()
-    ser.write(b'p')
-    device_ID_OG = device_ID
-    device_ID += 'x'
-    ser.write(bytes(device_ID, 'utf-8'))
-    while ser.in_waiting < len(device_ID) - 1:
-        pass
-
-    check_device_ID = ser.read_all().decode('utf-8')
-    print("Device ID is: ", check_device_ID)
-    
-    ser.close()
-    if check_device_ID == device_ID_OG: # TODO: error handling
-        return True
-    else:
-        return False
-
-
 def get_device_ID():
     ser = establish_serial()
     ser.write(b'g')
@@ -206,26 +187,6 @@ def get_device_ID():
             device_ID += ser.read(ser.in_waiting)
     device_ID = device_ID.decode('utf-8')
     return device_ID[:-1]
-
-
-def put_fw_ver(fw_ver):
-    ser = establish_serial()
-    ser.write(b'b')
-
-    fw_ver_OG = fw_ver
-    fw_ver += 'x'
-    ser.write(bytes(fw_ver, 'utf-8'))
-    while ser.in_waiting < len(fw_ver) - 1:
-        pass
-
-    check_fw_ver = ser.read_all().decode('utf-8')
-    print(fw_ver)
-
-    ser.close()
-    if check_fw_ver == fw_ver_OG: # TODO: error handling
-        return True
-    else:
-        return False
 
 
 def get_fw_ver():
