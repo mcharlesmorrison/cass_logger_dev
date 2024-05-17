@@ -6,30 +6,8 @@ from pathlib import Path
 import pandas as pd
 import serial.tools.list_ports
 
-# Copyright (c) 2023 Cass Labs LLC (author: Matthew Morrison)
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
-# -------------------------------------------------------------------------- #
-
-# TODO: Windows compatability
-# TODO: manual port setting
+# TODO:
+# - Add windows compatability (for get_serial_ports & establish_serial)
 
 
 def get_serial_ports():
@@ -70,7 +48,7 @@ def establish_serial(baud_rate=9600):
     elif data_response == "x":
         pass
     else:
-        print("No response from teensy!")
+        print("ERROR! No response from teensy!")
         return None
 
     _flush_all(ser_data, ser_command)
@@ -99,7 +77,7 @@ def list_files():
     return result.splitlines()[:-1]
 
 
-def file_sizes():
+def list_file_sizes():
     ser_data, ser_command = establish_serial()
 
     files = list_files()  # list files
@@ -128,7 +106,7 @@ def delete_all_files():
     if len(list_files()) == 0:
         return 1
     else:
-        print("Error deleting files!")
+        print("ERROR DELETING FILES!")
         return 0
 
 
@@ -136,15 +114,15 @@ def _delete_file(filename, ser_data, ser_command):
     ser_command.flushInput()
     ser_command.write(b"x")  # delete file
 
-    filename = bytes(filename, "utf-8")
+    filename = bytes(filename, "utf-8")  # write filename to be deleted
     ser_command.write(filename)
 
-    b_success = ser_data.read_until(b"x")
+    b_success = ser_data.read_until(b"x")  # check for success
     b_success = int(b_success.decode("ascii").strip("x"))
     if b_success:
         return 1
     else:
-        print("Error deleting file!!")
+        print("ERROR DELETING FILE!")
         return 0
 
 
@@ -153,19 +131,24 @@ def _close_serial(ser_data, ser_command):
     ser_command.close()
 
 
+def _open_serial(ser_data, ser_command):
+    ser_data.open()
+    ser_command.open()
+
+
 def read_file(filename, file_size):
     ser_data, ser_command = establish_serial()
+    print("")
+    print("Filename is: ", filename)  # DEBUG
     filename_term = filename + "x"
     filename_term = bytes(filename_term, "utf-8")
 
     sd_buff_size = 5120
     num_buffs = file_size / sd_buff_size
-    print("Original num buffs = ", num_buffs)
-
+    fractional_buffs = num_buffs - int(num_buffs)
+    # TODO: add fractional buffer transfer at end
     if file_size % sd_buff_size != 0:
-        print("chopping last buffer")
-        num_buffs = file_size // sd_buff_size
-        print("New num buffs = ", num_buffs)
+        num_buffs = file_size // sd_buff_size  # skip last incomplete sd_buffer
     num_buffs = int(num_buffs)
     bytes_received = []
 
@@ -174,11 +157,14 @@ def read_file(filename, file_size):
 
     sd_buff = bytes()
     sd_buff_idx = 0
-
-    for i in range(num_buffs):
+    retry_loop = False
+    i = 0
+    while i < num_buffs:
         ser_command.write(b"t")
         timer = time.monotonic()
 
+        sd_buff_idx = 0
+        retry_loop = False
         while sd_buff_idx < sd_buff_size:
             num_read = min(int(ser_data.in_waiting), sd_buff_size - sd_buff_idx)
             if num_read > 0:
@@ -186,14 +172,43 @@ def read_file(filename, file_size):
                 sd_buff_idx += num_read
                 sd_buff += bytesIn
                 timer = time.monotonic()
+            elif num_read == 0 and time.monotonic() - timer > 0.1:
+                # reset the position in the file to curr_position - sd_butt_idx
+                buff_success = _reset_buff(ser_data, ser_command, i * sd_buff_size)
+                sd_buff = []
+                retry_loop = True
+                break
 
+        if retry_loop:
+            i -= 1
+
+        i += 1
         bytes_received.extend(sd_buff)
         sd_buff = bytes()
         sd_buff_idx = 0
 
+    # DEBUG
+    expected_byte_number = num_buffs * sd_buff_size
+    number_buffs_off = expected_byte_number - len(bytes_received)
+    print("Number of bytes short = {}".format(number_buffs_off))
+
     ser_command.write(b"c")  # close target file
     _close_serial(ser_data, ser_command)
     return bytes_received
+
+
+def _reset_buff(ser_data, ser_command, reset_pos):
+    _close_serial(ser_data, ser_command)
+    _open_serial(ser_data, ser_command)
+
+    ser_command.write(b"n")  # reset buffer idx
+
+    reset_pos = str(reset_pos)
+    reset_pos += "x"
+    ser_data.write(bytes(reset_pos, "utf-8"))  # send reset idx
+
+    return_position = ser_data.read_until(b"x").decode("utf-8").strip()
+    return True
 
 
 def bytes_to_file(my_bytes, filename, filepath="tmp_{}".format(int(time.time()))):
@@ -208,7 +223,7 @@ def bytes_to_file(my_bytes, filename, filepath="tmp_{}".format(int(time.time()))
 
 def download_all():
     my_filenames = list_files()
-    my_file_sizes = file_sizes()
+    my_file_sizes = list_file_sizes()
     if not len(my_filenames):
         return []
     dir_name = "tmp_{}".format(int(time.time()))
@@ -224,7 +239,7 @@ def download_all():
 def put_device_ID(device_ID):
     ser_data, ser_command = establish_serial()
     ser_command.write(b"p")  # eeprom put
-    device_ID_OG = device_ID
+    device_ID_orig = device_ID
     device_ID += "x"
     print("device_ID to write = ", device_ID)
     ser_data.write(bytes(device_ID, "utf-8"))
@@ -235,7 +250,7 @@ def put_device_ID(device_ID):
     print("Device ID is: ", check_device_ID)
 
     _close_serial(ser_data, ser_command)
-    if check_device_ID == device_ID_OG:
+    if check_device_ID == device_ID_orig:  # TODO: error handling
         return True
     else:
         return False
@@ -324,7 +339,11 @@ def process_data_file(filepath, filename):
     #   float Tz;
     # };"""
     # This function returns a pandas Data Frame object with Cass Logger Data pulled from a binary file
+    # TODO: need to make firmware key for numpy data processing handling
+
+    # create file path object
     full_filename = Path(filepath, filename)
+    # Create a dtype with the binary data format and the desired column names
     dt = np.dtype(
         [
             ("tmicros", "i4"),
