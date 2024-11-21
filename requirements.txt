@@ -1,6 +1,6 @@
 pyserial==3.5
 python-dateutil==2.8.2
 pandas==1.5.3
-numpy==1.25.2
+numpy>=1.25.2
 DateTime==4.9
 pathlib==1.0.1
