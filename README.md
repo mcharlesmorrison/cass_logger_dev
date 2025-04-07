@@ -15,4 +15,7 @@ CLI for developers to interface with the Cass Logger.
    ```bash
    pip install -r requirements.txt
 
-3. Explore usage examples in the python/ folder — you’ll find scripts you can run to interact with the logger and test functionality.
+3. Explore usage examples in the python/ folder — you’ll find scripts you can run to interact with the logger and test functionality:
+
+   ```bash
+   python3 python/download_and_process_example.py
