@@ -5,6 +5,8 @@ import numpy as np
 from pathlib import Path
 import pandas as pd
 import serial.tools.list_ports
+import datetime
+
 
 # TODO:
 # - Add windows compatability (for get_serial_ports & establish_serial)
@@ -14,7 +16,7 @@ def get_serial_ports():
     ports = serial.tools.list_ports.comports()
     logger_ports = [port.device for port in ports if "usbmodem" in port.device]
     if len(logger_ports) != 2:
-        print("Error! Dual Serial Ports not found!")
+        print("No dual serial ports found!")
         return None
     else:
         return logger_ports
@@ -62,6 +64,56 @@ def _flush_all(ser_data, ser_command):
     ser_command.flush()
 
 
+def set_RTC_time():
+    ser_data, ser_command = establish_serial()
+
+    # Get current time
+    current_time = datetime.datetime.now()
+    print("Current time: ", current_time)
+    # Format time string
+    time_string = current_time.strftime("%Y-%m-%d %H:%M:%S")
+    print("Time string: ", time_string)
+    # Add termination character
+    time_string += "x"
+
+    # Send command to set RTC time
+    ser_command.write(b"e")
+
+    # Send time string
+    ser_data.write(time_string.encode("utf-8"))
+
+    # Wait for confirmation and unix time
+    unix_time = ""
+    while True:
+        char = ser_data.read(1).decode("utf-8")
+        if char == "x":
+            break
+        unix_time += char
+
+    _close_serial(ser_data, ser_command)
+
+    if unix_time:
+        print(f"RTC time set successfully. Unix time: {unix_time}")
+        return True
+    else:
+        print("Failed to set RTC time")
+        return False
+
+
+def get_RTC_time():
+    ser_data, ser_command = establish_serial()
+
+    ser_command.write(b"h")
+
+    unix_time = ""
+    while True:
+        char = ser_data.read(1).decode("utf-8")
+        if char == "x":
+            break
+        unix_time += char
+    return unix_time
+
+
 def list_files():
     ser_data, ser_command = establish_serial()
     ser_command.write(b"l")  # list files
@@ -96,7 +148,12 @@ def list_file_sizes():
     return my_file_sizes
 
 
-def delete_all_files():
+def delete_all_files(prompt_user=True):
+    if prompt_user:
+        user_input = input("Are you sure you want to delete all files? (y/n): ")
+        if user_input.lower() != "y":
+            print("Operation cancelled by user.")
+            return 0
     ser_data, ser_command = establish_serial()
 
     [_delete_file(filename, ser_data, ser_command) for filename in list_files()]
@@ -305,6 +362,20 @@ def get_fw_ver():
     return fw_ver[:-1]
 
 
+def handle_tmicros_rollover(col):
+    step_micros = col[1] - col[0]
+    idx_max = col.idxmax()
+
+    n_remaining = len(col) - idx_max
+    after_rollover_vals = (
+        np.arange(n_remaining, dtype=np.int64) * step_micros + col.iloc[idx_max]
+    )
+
+    adjusted_col = col.copy()
+    adjusted_col.iloc[idx_max:] = after_rollover_vals
+    return adjusted_col
+
+
 def process_data_file(filepath, filename):
     """Struct format from FIRMWARE!
 
@@ -341,9 +412,9 @@ def process_data_file(filepath, filename):
     # This function returns a pandas Data Frame object with Cass Logger Data pulled from a binary file
     # TODO: need to make firmware key for numpy data processing handling
 
-    # create file path object
-    full_filename = Path(filepath, filename)
-    # Create a dtype with the binary data format and the desired column names
+    full_filename = Path(filepath) / filename
+
+    # create a dtype with the binary data format and the desired column names
     dt = np.dtype(
         [
             ("tmicros", "i4"),
@@ -376,10 +447,19 @@ def process_data_file(filepath, filename):
             ("Tz", "f4"),
         ]
     )
+
     data = np.fromfile(full_filename, dtype=dt)
     df = pd.DataFrame(data)
-    df["tmicros"] = df["tmicros"].apply(lambda x: x - df["tmicros"].iloc[0])
-    df.insert(1, "t", df["tmicros"].apply(lambda x: x * 1e-6))
+
+    # fix rollover if necessary
+    if (df["tmicros"] < 0).any():
+        df["tmicros"] = df["tmicros"].astype(np.float64)
+        df["tmicros"] = handle_tmicros_rollover(df["tmicros"])
+
+    df["tmicros"] -= df["tmicros"].iloc[0]
+    df.insert(1, "t", df["tmicros"] * 1e-6)
+
+    # reorder columns
     cols = [
         "tmicros",
         "t",
@@ -412,4 +492,5 @@ def process_data_file(filepath, filename):
         "Tz",
     ]
     df = df[cols]
+
     return df
