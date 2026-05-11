@@ -350,13 +350,7 @@ class CassCommands:
                     sd_buff += bytesIn
                     time_in_buffer = time.monotonic()
                 elif num_read == 0 and (time.monotonic() - time_in_buffer > 0.1):
-                    # NOTE: why does this condition represent a data corruption?
-                    # reset the position in the file to (curr_position - sd_byte_idx)
-                    # while (self.ser_data.in_waiting) > 0:
-                    #     self.ser_data.read(self.ser_data.in_waiting)  # clear serial buffer
-                    #     print("Clearing serial buffer...")              # doesn't seem to be doing anything
                     self.ser_data.reset_input_buffer()  # clear serial buffer before initiating reset
-                    # self.ser_data.reset_output_buffer()
                     buff_success = self._reset_buff((i) * sd_buff_size, filename)
                     sd_buff = []
                     retry_loop = True
@@ -380,71 +374,6 @@ class CassCommands:
         self.ser_command.write(b"c")  # close target file
         self._close_serial()
         return bytes_received
-
-    # def read_file(self, filename, file_size, max_retries=15):
-    #     """
-    #     Download a file from the device over serial.
-
-    #     If a timeout happens mid-transfer, the whole file transfer is restarted.
-    #     """
-
-    #     for attempt in range(max_retries):
-    #         try:
-    #             filename_term = (filename + "x").encode("utf-8")
-    #             sd_buff_size = 5120
-    #             num_buffs = file_size // sd_buff_size  # skip last partial buffer
-    #             bytes_received = []
-
-    #             # open target file
-    #             self.ser_command.write(b"o")
-    #             self.ser_data.write(filename_term)
-
-    #             sd_buff = bytes()
-    #             i = 0
-    #             while i < num_buffs:
-    #                 self.ser_command.write(b"t")
-    #                 timer = time.monotonic()
-
-    #                 sd_buff_idx = 0
-    #                 while sd_buff_idx < sd_buff_size:
-    #                     num_read = min(
-    #                         int(self.ser_data.in_waiting), sd_buff_size - sd_buff_idx
-    #                     )
-    #                     if num_read > 0:
-    #                         chunk = self.ser_data.read(num_read)
-    #                         sd_buff_idx += num_read
-    #                         sd_buff += chunk
-    #                         timer = time.monotonic()
-    #                     elif num_read == 0 and time.monotonic() - timer > 0.1:
-    #                         raise TimeoutError("Timeout during buffer transfer")
-
-    #                 bytes_received.extend(sd_buff)
-    #                 sd_buff = bytes()
-    #                 i += 1
-
-    #             # close target file
-    #             self.ser_command.write(b"c")
-    #             self._close_serial()
-
-    #             # DEBUG check
-    #             expected = num_buffs * sd_buff_size
-    #             if len(bytes_received) != expected:
-    #                 raise RuntimeError(
-    #                     f"Byte count mismatch: expected {expected}, got {len(bytes_received)}"
-    #                 )
-
-    #             return bytes_received
-
-    #         except (TimeoutError, RuntimeError) as e:
-    #             print(f"[Retry {attempt+1}/{max_retries}] Error: {e}")
-    #             print(f"filename is: {filename}")
-    #             # clean up and try again
-    #             self.ser_command.write(b"c")
-    #             time.sleep(0.05)  # give device a moment
-    #             self._flush_all()
-    #             time.sleep(0.05)  # give device a moment
-    #             if attempt == max_retries - 1:
-    #                 raise  # re-raise if out of retries
 
     def bytes_to_file(
         self, my_bytes, filename, filepath="tmp_{}".format(int(time.time()))
