@@ -23,7 +23,10 @@ import pandas as pd
 import serial.tools.list_ports
 import datetime
 import warnings
-from src.firmware_structs import FIRMWARE_DTYPES, COLUMN_ORDERS
+from .firmware_structs import (
+    FIRMWARE_DTYPES,
+    COLUMN_ORDERS,
+)
 from typing import Optional, Union, Dict, List
 import re
 import platform

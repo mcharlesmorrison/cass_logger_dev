@@ -41,7 +41,7 @@ Run directly::
     python examples/load_and_plot_ex.py
 """
 
-import src.cass_commands as cass_commands
+import cass_logger_dev.cass_commands as cass_commands
 from pathlib import Path
 from matplotlib import pyplot as plt
 import pandas as pd
