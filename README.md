@@ -2,20 +2,27 @@
 
 Simple Python package for developers to interface with the Cass Logger. This package allows users to perform simple operations on the logger and download/process data.
 
-> **Platform support:** macOS and Linux only. Windows is not currently supported, but will be IMMINENTLY ❤️!
-
 ## 🛠️ How to Use
 
 1. Create a virtual environment:
 
+   **macOS / Linux:**
    ```bash
    python3 -m venv venv
-   source venv/bin/activate  # On Windows use: venv\Scripts\activate
+   source venv/bin/activate
+   ```
 
-2. Install required dependencies:
+   **Windows:**
+   ```cmd
+   python -m venv venv
+   venv\Scripts\activate
+   ```
+
+2. Install the package and its dependencies:
 
    ```bash
-   pip install -r requirements.txt
+   pip install -e .
+   ```
 
 3. Explore usage examples in the `examples/` folder — you’ll find scripts you can run to interact with the logger and test functionality:
 
@@ -24,17 +31,24 @@ Simple Python package for developers to interface with the Cass Logger. This pac
    | `examples/load_and_plot_ex.py` | Load a pre-downloaded `.bin` file from `examples/data/` and plot potentiometer (fork/shock) data |
    | `examples/download_and_plot_ex.py` | Download data from a connected device, then plot internal IMU (accelerometer) data |
 
+   **macOS / Linux:**
    ```bash
    python3 examples/load_and_plot_ex.py
    python3 examples/download_and_plot_ex.py
    ```
 
+   **Windows:**
+   ```cmd
+   python examples\load_and_plot_ex.py
+   python examples\download_and_plot_ex.py
+   ```
+
 ## 📋 Logger Operations
 
-All operations are available through `CassCommands` in `src/cass_commands.py`. Serial ports are opened automatically on first use.
+All operations are available through `CassCommands` in `cass_logger_dev/cass_commands.py`. Serial ports are opened automatically on first use.
 
 ```python
-from src.cass_commands import CassCommands
+from cass_logger_dev.cass_commands import CassCommands
 cass_utils = CassCommands()
 ```
 
